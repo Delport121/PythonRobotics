@@ -17,12 +17,12 @@ import numpy as np
 from utils.angle import rot_mat_2d
 
 # Estimation parameter of PF
-Q = np.diag([0.2]) ** 2  # range error
-R = np.diag([2.0, np.deg2rad(40.0)]) ** 2  # input error
+Q = np.diag([1.0]) ** 2  # range error (Process covariance matrix -> How much the motion model is trusted)
+R = np.diag([2.0, np.deg2rad(40.0)]) ** 2  # input error (Measurement covariance matrix -> How much the observation is trusted) (Higher variance reduces weights)
 
 #  Simulation parameter
-Q_sim = np.diag([0.2]) ** 2
-R_sim = np.diag([1.0, np.deg2rad(30.0)]) ** 2
+Q_sim = np.diag([0.2]) ** 2 #(Process Noise Covariance Matrix)
+R_sim = np.diag([1.0, np.deg2rad(30.0)]) ** 2   #(Measurement Noise Covariance Matrix)
 
 DT = 0.1  # time tick [s]
 SIM_TIME = 50.0  # simulation time [s]
@@ -34,41 +34,46 @@ NTh = NP / 2.0  # Number of particle for re-sampling
 
 show_animation = True
 
-
 def calc_input():
     v = 1.0  # [m/s]
-    yaw_rate = 0.1  # [rad/s]
+    yaw_rate = 0.2  # [rad/s]
     u = np.array([[v, yaw_rate]]).T
     return u
 
 
-def observation(x_true, xd, u, rf_id):
+def observation(x_true, xd, u, rf_id):  
     x_true = motion_model(x_true, u)
 
-    # add noise to gps x-y
     z = np.zeros((0, 3))
 
     for i in range(len(rf_id[:, 0])):
-
+        # Calculate the distance between the true state and each landmark
         dx = x_true[0, 0] - rf_id[i, 0]
         dy = x_true[1, 0] - rf_id[i, 1]
         d = math.hypot(dx, dy)
+
+        # Check if the landmark is within the maximum observation range
         if d <= MAX_RANGE:
-            dn = d + np.random.randn() * Q_sim[0, 0] ** 0.5  # add noise
+            # Add noise to the observed distance
+            dn = d + np.random.randn() * Q_sim[0, 0] ** 0.5
+            # Construct the observation vector [observed distance, x-coordinate of the landmark, y-coordinate of the landmark]
             zi = np.array([[dn, rf_id[i, 0], rf_id[i, 1]]])
+            # Stack the observation to the observations array
             z = np.vstack((z, zi))
 
-    # add noise to input
+    # Add noise to the control inputs
     ud1 = u[0, 0] + np.random.randn() * R_sim[0, 0] ** 0.5
     ud2 = u[1, 0] + np.random.randn() * R_sim[1, 1] ** 0.5
     ud = np.array([[ud1, ud2]]).T
 
+    # Propagate the dead reckoning estimate using the noisy control inputs
     xd = motion_model(xd, ud)
 
+    # Return the updated true state, the list of observations, the updated dead reckoning estimate, and the noisy control inputs
     return x_true, z, xd, ud
 
 
-def motion_model(x, u):
+def motion_model(x, u): #X is the state vector:[x, y, yaw, v], U is the input vector: [v, yaw_rate]
     F = np.array([[1.0, 0, 0, 0],
                   [0, 1.0, 0, 0],
                   [0, 0, 1.0, 0],
@@ -79,7 +84,7 @@ def motion_model(x, u):
                   [0.0, DT],
                   [1.0, 0.0]])
 
-    x = F.dot(x) + B.dot(u)
+    x = F.dot(x) + B.dot(u) # Think state estimation as a linear combination of the previous state and the input
 
     return x
 
@@ -107,21 +112,17 @@ def calc_covariance(x_est, px, pw):
 
 
 def pf_localization(px, pw, z, u):
-    """
-    Localization with Particle filter
-    """
-
     for ip in range(NP):
         x = np.array([px[:, ip]]).T
         w = pw[0, ip]
 
-        #  Predict with random input sampling
+        # Predict with random input sampling
         ud1 = u[0, 0] + np.random.randn() * R[0, 0] ** 0.5
         ud2 = u[1, 0] + np.random.randn() * R[1, 1] ** 0.5
         ud = np.array([[ud1, ud2]]).T
         x = motion_model(x, ud)
 
-        #  Calc Importance Weight
+        # Calculate importance weight based on observed measurements
         for i in range(len(z[:, 0])):
             dx = x[0, 0] - z[i, 1]
             dy = x[1, 0] - z[i, 2]
@@ -129,19 +130,27 @@ def pf_localization(px, pw, z, u):
             dz = pre_z - z[i, 0]
             w = w * gauss_likelihood(dz, math.sqrt(Q[0, 0]))
 
+        # Update particle position and weight
         px[:, ip] = x[:, 0]
         pw[0, ip] = w
 
-    pw = pw / pw.sum()  # normalize
+    # Normalize weights
+    pw = pw / pw.sum()
 
+    # Estimate the state using weighted average of particles
     x_est = px.dot(pw.T)
+
+    # Calculate covariance of estimated state
     p_est = calc_covariance(x_est, px, pw)
 
-    N_eff = 1.0 / (pw.dot(pw.T))[0, 0]  # Effective particle number
+    # Calculate effective particle number
+    N_eff = 1.0 / (pw.dot(pw.T))[0, 0]
+
+    # Resample if effective particle number is below a threshold
     if N_eff < NTh:
         px, pw = re_sampling(px, pw)
-    return x_est, p_est, px, pw
 
+    return x_est, p_est, px, pw
 
 def re_sampling(px, pw):
     """
@@ -212,7 +221,9 @@ def main():
 
     # State Vector [x y yaw v]'
     x_est = np.zeros((4, 1))
+    #x_est = np.zeros((4, 1)) + np.array([[-5, 5, 0, 0]]).T
     x_true = np.zeros((4, 1))
+    #x_true = np.zeros((4, 1)) + np.array([[-1, 1, 0, 0]]).T
 
     px = np.zeros((4, NP))  # Particle store
     pw = np.zeros((1, NP)) + 1.0 / NP  # Particle weight

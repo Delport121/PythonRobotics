@@ -123,16 +123,16 @@ def ekf_estimation(xEst, PEst, z, u):
     #  Predict
     xPred = motion_model(xEst, u)
     jF = jacob_f(xEst, u)
-    PPred = jF @ PEst @ jF.T + Q
+    PPred = jF @ PEst @ jF.T + Q #Covariance extrapolation
 
     #  Update
     jH = jacob_h()
     zPred = observation_model(xPred)
     y = z - zPred
     S = jH @ PPred @ jH.T + R
-    K = PPred @ jH.T @ np.linalg.inv(S)
-    xEst = xPred + K @ y
-    PEst = (np.eye(len(xEst)) - K @ jH) @ PPred
+    K = PPred @ jH.T @ np.linalg.inv(S)  #Kalman Gain
+    xEst = xPred + K @ y                 #State update
+    PEst = (np.eye(len(xEst)) - K @ jH) @ PPred #Covariance update (But half of it?)
     return xEst, PEst
 
 

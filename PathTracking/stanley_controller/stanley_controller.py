@@ -13,8 +13,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import pathlib
-from utils.angle import angle_mod
 sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
+from utils.angle import angle_mod
 
 from PathPlanning.CubicSpline import cubic_spline_planner
 

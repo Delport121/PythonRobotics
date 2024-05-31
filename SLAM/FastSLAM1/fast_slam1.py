@@ -7,9 +7,12 @@ author: Atsushi Sakai (@Atsushi_twi)
 """
 
 import math
+import pathlib
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
+sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
 from utils.angle import angle_mod
 
 # Fast SLAM covariance

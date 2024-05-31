@@ -7,6 +7,9 @@ author: Atsushi Sakai (@Atsushi_twi)
 """
 
 import math
+import pathlib
+import sys
+sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
 
 import matplotlib.pyplot as plt
 import numpy as np
