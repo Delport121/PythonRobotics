@@ -57,6 +57,7 @@ def update(state, a, delta):
 def pi_2_pi(angle):
     return angle_mod(angle)
 
+
 def solve_dare(A, B, Q, R):
     """
     solve a discrete time_Algebraic Riccati equation (DARE)
@@ -223,8 +224,9 @@ def do_simulation(cx, cy, cyaw, ck, speed_profile, goal):
         if target_ind % 1 == 0 and show_animation:
             plt.cla()
             # for stopping simulation with the esc key.
-            plt.gcf().canvas.mpl_connect('key_release_event',
-                    lambda event: [exit(0) if event.key == 'escape' else None])
+            plt.gcf().canvas.mpl_connect(
+                'key_release_event',
+                lambda event: [exit(0) if event.key == 'escape' else None])
             plt.plot(cx, cy, "-r", label="course")
             plt.plot(x, y, "ob", label="trajectory")
             plt.plot(cx[target_ind], cy[target_ind], "xg", label="target")
@@ -291,6 +293,13 @@ def main():
         plt.axis("equal")
         plt.xlabel("x[m]")
         plt.ylabel("y[m]")
+        plt.legend()
+        plt.subplots(1)
+
+        plt.plot(t, np.array(v)*3.6, label="speed")
+        plt.grid(True)
+        plt.xlabel("Time [sec]")
+        plt.ylabel("Speed [m/s]")
         plt.legend()
 
         plt.subplots(1)
