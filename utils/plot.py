@@ -71,6 +71,7 @@ def plot_ellipse(x, y, a, b, angle, color="-r", ax=None, **kwargs):
         plt.plot(px, py, color, **kwargs)
     else:
         ax.plot(px, py, color, **kwargs)
+        
 
 
 def plot_arrow(x, y, yaw, arrow_length=1.0,

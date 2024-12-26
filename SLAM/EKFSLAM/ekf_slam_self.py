@@ -13,6 +13,7 @@ sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
 import matplotlib.pyplot as plt
 import numpy as np
 from utils.angle import angle_mod
+from utils.plot import *
 
 # EKF state covariance
 Cx = np.diag([0.5, 0.5, np.deg2rad(30.0)]) ** 2
@@ -24,6 +25,16 @@ R_sim = np.diag([1.0, np.deg2rad(10.0)]) ** 2
 DT = 0.1  # time tick [s]
 SIM_TIME = 50.0  # simulation time [s]
 MAX_RANGE = 15.0  # maximum observation range
+MAX_ANGLE_RANGE = math.pi  # maximum angle observation range
+M_DIST_TH = 2.0  # Threshold of Mahalanobis distance for data association.
+STATE_SIZE = 3  # State size [x,y,yaw]
+LM_SIZE = 2  # LM state size [x,y]
+
+
+DT = 0.1  # time tick [s]
+SIM_TIME = 15.0  # simulation time [s]
+MAX_RANGE =8.0  # maximum observation range
+MAX_ANGLE_RANGE = math.pi / 2.0  # maximum angle observation range
 M_DIST_TH = 2.0  # Threshold of Mahalanobis distance for data association.
 STATE_SIZE = 3  # State size [x,y,yaw]
 LM_SIZE = 2  # LM state size [x,y]
@@ -34,9 +45,14 @@ show_animation = True
 def ekf_slam(xEst, PEst, u, z):
     # Predict
     G, Fx = jacob_motion(xEst, u)
+    # print(G)
     xEst[0:STATE_SIZE] = motion_model(xEst[0:STATE_SIZE], u)
     PEst = G.T @ PEst @ G + Fx.T @ Cx @ Fx
     initP = np.eye(2)
+    
+    #Intermediate matrices to store the predicted state and covariance matrix
+    xPredicted = xEst
+    pPredicted = PEst
 
     # Update
     for iz in range(len(z[:, 0])):  # for each observation
@@ -68,12 +84,13 @@ def ekf_slam(xEst, PEst, u, z):
 
     xEst[2] = pi_2_pi(xEst[2])
 
-    return xEst, PEst
+    return xEst, PEst, xPredicted, pPredicted
 
 
 def calc_input():
     v = 1.0  # [m/s]
-    yaw_rate = 0.1  # [rad/s]
+    # yaw_rate = 0.1  # [rad/s]
+    yaw_rate = 0.0  # [rad/s]
     u = np.array([[v, yaw_rate]]).T
     return u
 
@@ -83,6 +100,7 @@ def observation(xTrue, xd, u, RFID):
 
     # add noise to gps x-y
     z = np.zeros((0, 3))
+    zTrue = np.zeros((0, 3))
 
     for i in range(len(RFID[:, 0])):
 
@@ -90,7 +108,8 @@ def observation(xTrue, xd, u, RFID):
         dy = RFID[i, 1] - xTrue[1, 0]
         d = math.hypot(dx, dy)
         angle = pi_2_pi(math.atan2(dy, dx) - xTrue[2, 0])
-        if d <= MAX_RANGE:
+        if d <= MAX_RANGE and (angle <= MAX_ANGLE_RANGE and angle >= -MAX_ANGLE_RANGE):
+            zTrue = np.vstack((zTrue, np.array([d, angle, i])))
             dn = d + np.random.randn() * Q_sim[0, 0] ** 0.5  # add noise
             angle_n = angle + np.random.randn() * Q_sim[1, 1] ** 0.5  # add noise
             zi = np.array([dn, angle_n, i])
@@ -102,7 +121,7 @@ def observation(xTrue, xd, u, RFID):
         u[1, 0] + np.random.randn() * R_sim[1, 1] ** 0.5]]).T
 
     xd = motion_model(xd, ud)
-    return xTrue, z, xd, ud
+    return xTrue, z, xd, ud, zTrue
 
 
 def motion_model(x, u):
@@ -208,6 +227,39 @@ def jacob_h(q, delta, x, i):
 def pi_2_pi(angle):
     return angle_mod(angle)
 
+def plot_landmark_covariance_ellipse(xEst, PEst, color="-r", ax=None):
+    for i in range(calc_n_lm(xEst)):
+        lm_x = xEst[STATE_SIZE + i * 2]
+        lm_y = xEst[STATE_SIZE + i * 2 + 1]
+        lm_P = PEst[STATE_SIZE + i * 2:STATE_SIZE + i * 2 + 2, STATE_SIZE + i * 2:STATE_SIZE + i * 2 + 2]
+        # print("lm_P\n", lm_P)
+        plot_ellipse(lm_x, lm_y, lm_P, color=color, ax=ax)
+        
+def plot_ellipse(x, y, cov, color="-r",ax=None):
+    eigvals, eigvecs = np.linalg.eigh(cov)
+    angle = np.arctan2(eigvecs[1, 0], eigvecs[0, 0])
+    width, height = 2 * np.sqrt(eigvals)
+    ellipse = plt.matplotlib.patches.Ellipse((x, y), width, height, angle=np.degrees(angle), edgecolor=color, fc='None', lw=2)
+    # plt.gca().add_patch(ellipse)
+    if ax is None:
+        plt.gca().add_patch(ellipse)
+    else:
+        ax.add_patch(ellipse)
+        # Plot the major and minor axes
+        for i in range(2):
+            axis_length = np.sqrt(eigvals[i])
+            axis_vector = eigvecs[:, i] * axis_length
+            ax.plot([x - axis_vector[0], x + axis_vector[0]], [y - axis_vector[1], y + axis_vector[1]], color=color, lw=1)
+        
+def plot_observation_line(x, z, ax=None):
+    for i in range(len(z[:, 0])):
+        x_l = x[0, 0] + z[i, 0] * math.cos(x[2, 0] + z[i, 1])
+        y_l = x[1, 0] + z[i, 0] * math.sin(x[2, 0] + z[i, 1])
+        if ax is None:
+            plt.plot([x[0, 0], x_l], [x[1, 0], y_l], "-k", label="Observation")
+        else:
+            ax.plot([x[0, 0], x_l], [x[1, 0], y_l], "-k", label="Observation")
+
 
 def main():
     print(__file__ + " start!!")
@@ -219,6 +271,12 @@ def main():
                      [15.0, 10.0],
                      [3.0, 15.0],
                      [-5.0, 20.0]])
+    
+    RFID = np.array([[4.0, -2.0],
+                     [5.0, -3.0],
+                     [10.0, 5.0],
+                     [12.0, -6.0],
+                     [4.0, 8.0]])
 
     # State Vector [x y yaw v]'
     xEst = np.zeros((STATE_SIZE, 1))
@@ -231,14 +289,20 @@ def main():
     hxEst = xEst
     hxTrue = xTrue
     hxDR = xTrue
+    
+    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+    # Flag to control the loop execution
+    running = True
 
+    colorbar = None
+    
     while SIM_TIME >= time:
         time += DT
         u = calc_input()
 
-        xTrue, z, xDR, ud = observation(xTrue, xDR, u, RFID)
+        xTrue, z, xDR, ud, zTrue = observation(xTrue, xDR, u, RFID)
 
-        xEst, PEst = ekf_slam(xEst, PEst, ud, z)
+        xEst, PEst, xPred, PPred = ekf_slam(xEst, PEst, ud, z)
 
         x_state = xEst[0:STATE_SIZE]
 
@@ -247,30 +311,55 @@ def main():
         hxDR = np.hstack((hxDR, xDR))
         hxTrue = np.hstack((hxTrue, xTrue))
 
+        
+        
         if show_animation:  # pragma: no cover
-            plt.cla()
-            # for stopping simulation with the esc key.
-            plt.gcf().canvas.mpl_connect(
-                'key_release_event',
-                lambda event: [exit(0) if event.key == 'escape' else None])
-
-            plt.plot(RFID[:, 0], RFID[:, 1], "*k")
-            plt.plot(xEst[0], xEst[1], ".r")
+            
+            # ax[1].clear()
+            # fig.clf() 
+            # print("z\n", z)
+            
+           
+            # Plot the main SLAM results
+            ax[0].plot(RFID[:, 0], RFID[:, 1], "*k")
+            ax[0].plot(xEst[0], xEst[1], ".r")
+            
+            plot_observation_line(xTrue, zTrue, ax=ax[0])
 
             # plot landmark
             for i in range(calc_n_lm(xEst)):
-                plt.plot(xEst[STATE_SIZE + i * 2],
-                         xEst[STATE_SIZE + i * 2 + 1], "xg")
+                ax[0].plot(xEst[STATE_SIZE + i * 2],
+                        xEst[STATE_SIZE + i * 2 + 1], "xg")
 
-            plt.plot(hxTrue[0, :],
-                     hxTrue[1, :], "-b")
-            plt.plot(hxDR[0, :],
-                     hxDR[1, :], "-k")
-            plt.plot(hxEst[0, :],
-                     hxEst[1, :], "-r")
-            plt.axis("equal")
-            plt.grid(True)
+            ax[0].plot(hxTrue[0, :],
+                    hxTrue[1, :], "-b")
+            ax[0].plot(hxDR[0, :],
+                    hxDR[1, :], "-k")
+            ax[0].plot(hxEst[0, :],
+                    hxEst[1, :], "-r")
+            ax[0].axis("equal")
+            ax[0].grid(True)
+            
+            #Plot predicted state covariance ellips
+            plot_ellipse(xPred[0], xPred[1], PPred[:2, :2], color="b", ax=ax[0])
+            # Plot update state covariance ellips
+            plot_ellipse(xEst[0], xEst[1], PEst[:2, :2], color="r", ax=ax[0])
+            # Plot the landmark covariance ellipses
+            plot_landmark_covariance_ellipse(xEst, PEst, color = 'green', ax=ax[0])
+
+            # Plot the covariance matrix
+            # if colorbar:
+            #     colorbar.remove()
+            # alphabets = ['X', 'Y', 'Theta', 'Xm', 'Ym']
+            cax = ax[1].matshow(PEst, cmap='viridis',vmin=0, vmax=1)
+            # colorbar = fig.colorbar(cax, ax=ax[1])
+            ax[1].set_title('Covariance Matrix')
+            # ax[1].set_xticklabels(['']+alphabets)
+            # ax[1].set_yticklabels(['']+alphabets)
+        
             plt.pause(0.001)
+            ax[0].cla()
+            ax[1].cla()   
 
 
 if __name__ == '__main__':

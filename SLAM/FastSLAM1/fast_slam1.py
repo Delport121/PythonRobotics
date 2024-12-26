@@ -123,7 +123,7 @@ def add_new_landmark(particle, z, Q_cov):
     Gz = np.array([[dx / d, dy / d],
                    [-dy / d2, dx / d2]])
     particle.lmP[2 * lm_id:2 * lm_id + 2] = np.linalg.inv(
-        Gz) @ Q_cov @ np.linalg.inv(Gz.T)
+        Gz) @ Q_cov @ np.linalg.inv(Gz.T) # Transforms the covariance from the measurement space to the cartesian space
 
     return particle
 
@@ -135,15 +135,15 @@ def compute_jacobians(particle, xf, Pf, Q_cov):
     d = math.sqrt(d2)
 
     zp = np.array(
-        [d, pi_2_pi(math.atan2(dy, dx) - particle.yaw)]).reshape(2, 1)
+        [d, pi_2_pi(math.atan2(dy, dx) - particle.yaw)]).reshape(2, 1) # Predicted measurement
 
     Hv = np.array([[-dx / d, -dy / d, 0.0],
-                   [dy / d2, -dx / d2, -1.0]])
+                   [dy / d2, -dx / d2, -1.0]]) # Jacobian of the measurement model with respect to the particle's state (position and orientation)
 
     Hf = np.array([[dx / d, dy / d],
-                   [-dy / d2, dx / d2]])
+                   [-dy / d2, dx / d2]]) # Jacobian of the measurement model with respect to the feature's position
 
-    Sf = Hf @ Pf @ Hf.T + Q_cov
+    Sf = Hf @ Pf @ Hf.T + Q_cov # Innovation covariance 
 
     return zp, Hv, Hf, Sf
 
