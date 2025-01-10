@@ -17,11 +17,15 @@ from utils.plot import *
 
 # EKF state covariance
 Cx = np.diag([0.5, 0.5, np.deg2rad(30.0)]) ** 2
+Cx = np.diag([0.01, 0.01, np.deg2rad(0.5)]) ** 2 # Testing with smaller values
 
 #  Simulation parameter
-Q_sim = np.diag([0.2, np.deg2rad(1.0)]) ** 2
-R_sim = np.diag([1.0, np.deg2rad(10.0)]) ** 2
+Q_sim = np.diag([0.1, np.deg2rad(1.0)]) ** 2
+R_sim = np.diag([0.1, np.deg2rad(10.0)]) ** 2
+Q_sim = np.diag([0.01, np.deg2rad(.05)]) ** 2 # Testing with smaller values
+R_sim = np.diag([0.05, np.deg2rad(.05)]) ** 2
 
+#Original settings
 DT = 0.1  # time tick [s]
 SIM_TIME = 50.0  # simulation time [s]
 MAX_RANGE = 15.0  # maximum observation range
@@ -31,15 +35,16 @@ STATE_SIZE = 3  # State size [x,y,yaw]
 LM_SIZE = 2  # LM state size [x,y]
 
 
-DT = 0.1  # time tick [s]
-SIM_TIME = 15.0  # simulation time [s]
-MAX_RANGE =8.0  # maximum observation range
+DT = 1  # time tick [s]
+SIM_TIME = 10.0  # simulation time [s]
+MAX_RANGE =3.5  # maximum observation range
 MAX_ANGLE_RANGE = math.pi / 2.0  # maximum angle observation range
-M_DIST_TH = 2.0  # Threshold of Mahalanobis distance for data association.
+M_DIST_TH = 2  # Threshold of Mahalanobis distance for data association.
 STATE_SIZE = 3  # State size [x,y,yaw]
 LM_SIZE = 2  # LM state size [x,y]
 
 show_animation = True
+save_fig =  None
 
 
 def ekf_slam(xEst, PEst, u, z):
@@ -239,7 +244,7 @@ def plot_ellipse(x, y, cov, color="-r",ax=None):
     eigvals, eigvecs = np.linalg.eigh(cov)
     angle = np.arctan2(eigvecs[1, 0], eigvecs[0, 0])
     width, height = 2 * np.sqrt(eigvals)
-    ellipse = plt.matplotlib.patches.Ellipse((x, y), width, height, angle=np.degrees(angle), edgecolor=color, fc='None', lw=2)
+    ellipse = plt.matplotlib.patches.Ellipse((x, y), width, height, angle=np.degrees(angle), edgecolor=color, fc='None', lw=1)
     # plt.gca().add_patch(ellipse)
     if ax is None:
         plt.gca().add_patch(ellipse)
@@ -256,15 +261,16 @@ def plot_observation_line(x, z, ax=None):
         x_l = x[0, 0] + z[i, 0] * math.cos(x[2, 0] + z[i, 1])
         y_l = x[1, 0] + z[i, 0] * math.sin(x[2, 0] + z[i, 1])
         if ax is None:
-            plt.plot([x[0, 0], x_l], [x[1, 0], y_l], "-k", label="Observation")
+            plt.plot([x[0, 0], x_l], [x[1, 0], y_l], "--k", label="Lidar Observation")
         else:
-            ax.plot([x[0, 0], x_l], [x[1, 0], y_l], "-k", label="Observation")
+            ax.plot([x[0, 0], x_l], [x[1, 0], y_l], "--k", label="Lidar Observation")
 
 
 def main():
     print(__file__ + " start!!")
 
     time = 0.0
+    save_fig = 0
 
     # RFID positions [x, y]
     RFID = np.array([[10.0, -2.0],
@@ -277,6 +283,12 @@ def main():
                      [10.0, 5.0],
                      [12.0, -6.0],
                      [4.0, 8.0]])
+    
+    RFID = np.array([[2.0, 1.0],
+                    [3.0, -1.0],
+                    [3.8, 1.0],
+                    [4.0, -0.5],
+                    [5.1, 0.8]])
 
     # State Vector [x y yaw v]'
     xEst = np.zeros((STATE_SIZE, 1))
@@ -295,6 +307,8 @@ def main():
     running = True
 
     colorbar = None
+
+    # hxEst = np.hstack((hxEst, hxEst))
     
     while SIM_TIME >= time:
         time += DT
@@ -307,6 +321,7 @@ def main():
         x_state = xEst[0:STATE_SIZE]
 
         # store data history
+        
         hxEst = np.hstack((hxEst, x_state))
         hxDR = np.hstack((hxDR, xDR))
         hxTrue = np.hstack((hxTrue, xTrue))
@@ -321,24 +336,37 @@ def main():
             
            
             # Plot the main SLAM results
-            ax[0].plot(RFID[:, 0], RFID[:, 1], "*k")
-            ax[0].plot(xEst[0], xEst[1], ".r")
+            ax[0].plot(RFID[:, 0], RFID[:, 1], "*k", label="Landmarks", markersize=10)
+            # ax[0].plot(xEst[0], xEst[1], ".r", label="Estimated Position")
             
             plot_observation_line(xTrue, zTrue, ax=ax[0])
 
             # plot landmark
-            for i in range(calc_n_lm(xEst)):
-                ax[0].plot(xEst[STATE_SIZE + i * 2],
-                        xEst[STATE_SIZE + i * 2 + 1], "xg")
+            # for i in range(calc_n_lm(xEst)):
+            #     ax[0].plot(xEst[STATE_SIZE + i * 2],
+            #             xEst[STATE_SIZE + i * 2 + 1], "xg")
 
             ax[0].plot(hxTrue[0, :],
-                    hxTrue[1, :], "-b")
+                    hxTrue[1, :], "-b", label="True Trajectory")
             ax[0].plot(hxDR[0, :],
-                    hxDR[1, :], "-k")
+                    hxDR[1, :], "-k", label="Dead Reckoning")
             ax[0].plot(hxEst[0, :],
-                    hxEst[1, :], "-r")
-            ax[0].axis("equal")
-            ax[0].grid(True)
+                    hxEst[1, :], marker = "o", markersize = 4, color = "r", label="Estimated Trajectory")
+           
+            
+            # ax[0].grid(True)
+            # Set specific x and y axis ranges
+            ax[0].set_xlim([-0.2, 7.2])
+            ax[0].set_ylim([-1.5, 1.5])
+            # Ensure equal scaling without overriding limits
+            ax[0].set_aspect('equal')
+            # ax[0].axis("equal")
+           # Remove axis numbering (but keep the ticks)
+            ax[0].tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
+
+            # Make sure the ticks appear on all sides (top, right, bottom, left)
+            ax[0].tick_params(axis='x', which='both', direction='in', length=3, top=True)
+            ax[0].tick_params(axis='y', which='both', direction='in', length=3, right=True)
             
             #Plot predicted state covariance ellips
             plot_ellipse(xPred[0], xPred[1], PPred[:2, :2], color="b", ax=ax[0])
@@ -351,15 +379,38 @@ def main():
             # if colorbar:
             #     colorbar.remove()
             # alphabets = ['X', 'Y', 'Theta', 'Xm', 'Ym']
+
+            # Min-max normalization
+            min_val = np.min(PEst)
+            max_val = np.max(PEst)
+            normalized_matrix = (PEst - min_val) / (max_val - min_val)
             cax = ax[1].matshow(PEst, cmap='viridis',vmin=0, vmax=1)
+            # cax = ax[1].matshow(normalized_matrix, cmap='viridis',vmin=0, vmax=1)
             # colorbar = fig.colorbar(cax, ax=ax[1])
             ax[1].set_title('Covariance Matrix')
             # ax[1].set_xticklabels(['']+alphabets)
             # ax[1].set_yticklabels(['']+alphabets)
-        
+
+            # ax[0].set_title('EKF SLAM')
+            # ax[0].legend()
+
+            if save_fig != 8:
+                # Temporarily hide ax[1] to save only ax[0]
+                ax[1].set_visible(False)
+
+                # Save only ax[0]
+                plt.savefig(f"SLAM/EKFSLAM/Plots/EKF_SLAM_{save_fig}.svg", format="svg", bbox_inches="tight")  
+                save_fig += 1  # Increment the counter for the next iteration
+
+                # Make ax[1] visible again after saving
+                ax[1].set_visible(True)
+    
             plt.pause(0.001)
             ax[0].cla()
             ax[1].cla()   
+
+           
+
 
 
 if __name__ == '__main__':

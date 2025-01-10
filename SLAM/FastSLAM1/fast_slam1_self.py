@@ -14,7 +14,7 @@ R = np.diag([1.0, np.deg2rad(20.0)]) ** 2
 #  Simulation parameter
 Q_sim = np.diag([0.3, np.deg2rad(2.0)]) ** 2
 R_sim = np.diag([0.5, np.deg2rad(10.0)]) ** 2
-OFFSET_YAW_RATE_NOISE = 0.01
+OFFSET_YAW_RATE_NOISE = 0.1
 
 DT = 0.1  # time tick [s]
 SIM_TIME = 50.0  # simulation time [s]
@@ -24,6 +24,19 @@ STATE_SIZE = 3  # State size [x,y,yaw]
 LM_SIZE = 2  # LM state size [x,y]
 N_PARTICLE = 100  # number of particle
 NTH = N_PARTICLE / 1.5  # Number of particle for re-sampling
+
+DT = 0.1  # time tick [s]
+SIM_TIME = 50.0  # simulation time [s]
+MAX_RANGE = 20.0  # maximum observation range
+M_DIST_TH = 2.0  # Threshold of Mahalanobis distance for data association.
+STATE_SIZE = 3  # State size [x,y,yaw]
+LM_SIZE = 2  # LM state size [x,y]
+N_PARTICLE = 100  # number of particle
+NTH = N_PARTICLE / 1.5  # Number of particle for re-sampling
+
+VELOCITY = 1,0  # velocity noise
+YAW_RATE = 0.0  # yaw rate noise
+
 
 show_animation = True
 
@@ -300,12 +313,17 @@ def observation(xTrue, xd, u, rfid):
     # z = [distance, angle, i]'
 
 def calc_input(time):
+    # if time <= 3.0:  # wait at first
     if time <= 3.0:  # wait at first
         v = 0.0
         yaw_rate = 0.0
     else:
-        v = 1.0  # [m/s]
-        yaw_rate = 0.1  # [rad/s]
+        v = VELOCITY  # [m/s]
+        yaw_rate = YAW_RATE  # [rad/s]
+
+    # v = VELOCITY  # [m/s]
+    # yaw_rate = YAW_RATE  # [rad/s] 
+    # u = np.array([[v, yaw_rate]]).T
 
     u = np.array([v, yaw_rate]).reshape(2, 1)
 
@@ -336,15 +354,22 @@ def main():
     time = 0.0
 
     # RFID positions [x, y]
-    RFID = np.array([[10.0, -2.0],
-                     [15.0, 10.0],
-                     [15.0, 15.0],
-                     [10.0, 20.0],
-                     [3.0, 15.0],
-                     [-5.0, 20.0],
-                     [-5.0, 5.0],
-                     [-10.0, 15.0]
-                     ])
+    # RFID = np.array([[10.0, -2.0],
+    #                  [15.0, 10.0],
+    #                  [15.0, 15.0],
+    #                  [10.0, 20.0],
+    #                  [3.0, 15.0],
+    #                  [-5.0, 20.0],
+    #                  [-5.0, 5.0],
+    #                  [-10.0, 15.0]
+    #                  ])
+
+    RFID = np.array([[4.0, -2.0],
+                    [5.0, -3.0],
+                    [10.0, 5.0],
+                    [12.0, -6.0],
+                    [4.0, 8.0]])
+    
     n_landmark = RFID.shape[0]
 
     # State Vector [x y yaw v]'
