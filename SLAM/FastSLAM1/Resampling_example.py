@@ -82,7 +82,11 @@ def fast_slam1(particles, u, z, save_fig_number):
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
+    plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
+    plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     plt.show()
+    
    
     predicted_particles = predict_particles(particles, u)
     
@@ -100,6 +104,9 @@ def fast_slam1(particles, u, z, save_fig_number):
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
+    plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
+    plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     plt.show()
     if save_fig_number != 5:
         plt.savefig(f"SLAM/FastSLAM1/Plots/Resampling_{save_fig_number}.png", bbox_inches="tight")  
@@ -110,6 +117,9 @@ def fast_slam1(particles, u, z, save_fig_number):
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
+    plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
+    plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     plt.show()
     if save_fig_number != 5:
                 plt.savefig(f"SLAM/FastSLAM1/Plots/Resampling_{save_fig_number}.png", bbox_inches="tight")  
@@ -125,6 +135,9 @@ def fast_slam1(particles, u, z, save_fig_number):
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
+    plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
+    plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     plt.show()
     if save_fig_number != 5:
             plt.savefig(f"SLAM/FastSLAM1/Plots/Resampling_{save_fig_number}.png", bbox_inches="tight")  
@@ -138,7 +151,7 @@ def fast_slam1(particles, u, z, save_fig_number):
      
     plt.show()
 
-    return predicted_particles, resampled_particles
+    return predicted_particles, resampled_particles ,save_fig_number
 
 
 def normalize_weight(particles):
@@ -249,7 +262,7 @@ def resampling(particles, gps_coordinate):
         # print("Weights normalised:", pw)
         # print("Cumulative Weights:", w_cum)
         # print("Resample IDs:", resample_id)
-        print(f"Resampling indexes: {indexes}")
+        # print(f"Resampling indexes: {indexes}")
 
         tmp_particles = particles[:]
         for i in range(len(indexes)):
@@ -442,7 +455,7 @@ def main():
         z = np.array([3,0])
         print(z)
 
-        predicted_particles, particles = fast_slam1(particles, ud, z, save_fig_number)
+        predicted_particles, particles, save_fig_number = fast_slam1(particles, ud, z, save_fig_number)
 
         x_est = calc_final_state(particles)
 
