@@ -1,6 +1,6 @@
 """
 
-FastSLAM 1.0 example
+FastSLAM 2.0 example
 
 author: Atsushi Sakai (@Atsushi_twi)
 
@@ -9,22 +9,27 @@ author: Atsushi Sakai (@Atsushi_twi)
 import math
 import pathlib
 import sys
+sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
 import copy
 
 import matplotlib.pyplot as plt
 import numpy as np
-sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
 from utils.angle import angle_mod
 
 # Fast SLAM covariance
-Q = np.diag([0.08, np.deg2rad(10.0)]) ** 2 #0 may cause issues with cholesky decomposition
+Q = np.diag([3.0, np.deg2rad(10.0)]) ** 2
+R = np.diag([1.0, np.deg2rad(20.0)]) ** 2
+
+Q = np.diag([0.08, np.deg2rad(1.0)]) ** 2 #0 may cause issues with cholesky decomposition
 R = np.diag([0.2, np.deg2rad(10.0)]) ** 2 #Determine variance in input for different particles
-R = np.diag([0.05, np.deg2rad(2)]) ** 2 #Determine variance in input for different particles
-
-
+R = np.diag([0.08, np.deg2rad(4.0)]) ** 2 #Determine variance in input for different particles
 
 #  Simulation parameter
-Q_SIM = np.diag([0.01, np.deg2rad(1.0)]) ** 2 #Need to have non-zero values for cholesky decomposition
+Q_SIM = np.diag([0.3, np.deg2rad(2.0)]) ** 2
+R_SIM = np.diag([0.5, np.deg2rad(10.0)]) ** 2
+OFFSET_YAW_RATE_NOISE = 0.01
+
+Q_SIM = np.diag([0.01, np.deg2rad(0.5)]) ** 2 #Need to have non-zero values for cholesky decomposition
 R_SIM = np.diag([0.01, np.deg2rad(1.0)]) ** 2 #Determine a variance in input that is used for all particles
 OFFSET_YAW_RATE_NOISE = 0.0
 
@@ -34,7 +39,7 @@ MAX_RANGE = 20.0  # maximum observation range
 M_DIST_TH = 2.0  # Threshold of Mahalanobis distance for data association.
 STATE_SIZE = 3  # State size [x,y,yaw]
 LM_SIZE = 2  # LM state size [x,y]
-N_PARTICLE = 400  # number of particle
+N_PARTICLE = 100  # number of particle
 NTH = N_PARTICLE / 1.5  # Number of particle for re-sampling
 
 DT = 1  # time tick [s]
@@ -46,13 +51,9 @@ LM_SIZE = 2  # LM state size [x,y]
 N_PARTICLE = 100  # number of particle
 NTH = N_PARTICLE / 1.2  # Number of particle for re-sampling
 
+
 MAX_ANGLE_RANGE = math.pi / 2.0  # maximum angle observation range
-MAX_RANGE =3.5  # maximum observation range
-
-
 show_animation = True
-global_history = []  # Stores the trajectories of dead particles
-
 
 
 class Particle:
@@ -62,23 +63,20 @@ class Particle:
         self.x = 0.0
         self.y = 0.0
         self.yaw = 0.0
+        self.P = np.eye(3)
         # landmark x-y positions
         self.lm = np.zeros((n_landmark, LM_SIZE))
         # landmark position covariance
         self.lmP = np.zeros((n_landmark * LM_SIZE, LM_SIZE))
-        self.history = [( self.x, self.y, self.yaw)]  # Initialize history with the current state
 
 
-def fast_slam1(particles, u, z):
-
-
+def fast_slam2(particles, u, z):
+    
     prev_particles = copy.deepcopy(particles) # Store the previous particles for plotting propagation lines. 
 
-   
-    
     #First plot t=0 and will also plot resampled partilces
     for i in range(N_PARTICLE):
-                plt.plot(particles[i].x, particles[i].y, ".g", markersize = 5,zorder = 5)
+                plt.plot(particles[i].x, particles[i].y, ".g", markersize = 5)
     # print("Prev particles x", prev_particles[0].x)
     # print("Prev particles y", prev_particles[0].y)
     plt.xlim([-0.2, 7.2])
@@ -88,7 +86,7 @@ def fast_slam1(particles, u, z):
     plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
     plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     plt.show()
-
+    
     predicted_particles = predict_particles(particles, u)
 
     # Plot propagation lines
@@ -96,7 +94,7 @@ def fast_slam1(particles, u, z):
         plt.plot(
             [prev_particles[i].x, predicted_particles[i].x],
             [prev_particles[i].y, predicted_particles[i].y],
-            "-o",color="grey", linewidth=0.5,markersize = 2,zorder=4
+            "-o",color="grey", linewidth=0.5,markersize = 2,zorder=1  # Blue line for propagation
         )
         # plt.plot(predicted_particles[i].x, predicted_particles[i].y, ".k", markersize=2)  # Predicted particles
     plt.xlim([-0.2, 7.2])
@@ -107,11 +105,11 @@ def fast_slam1(particles, u, z):
     plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     plt.show()
 
-    updated_particles = update_with_observation(predicted_particles, z)
+    updated_particles = update_with_observation(particles, z)
     
     #Plot land mark partilces of each particle
     for i in range(N_PARTICLE):
-        plt.plot(updated_particles[i].lm[:, 0], updated_particles[i].lm[:, 1], "xb", markersize = 2, zorder = 3)
+        plt.plot(updated_particles[i].lm[:, 0], updated_particles[i].lm[:, 1], "xb", markersize = 2, zorder = 1)
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
@@ -119,7 +117,7 @@ def fast_slam1(particles, u, z):
     plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
     plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     plt.show()
-
+    
     # Plot original particles with color intensity based on weights
     plot_particles_with_weights(updated_particles, z, title="Original Particles Before Resampling", overlay=True)
     plt.xlim([-0.2, 7.2])
@@ -130,11 +128,10 @@ def fast_slam1(particles, u, z):
     plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     plt.show()
     
-    
 
-    resampled_particles = resampling(updated_particles)
+    particles = resampling(particles)
 
-    return predicted_particles, resampled_particles
+    return particles
 
 def plot_particles_with_weights(particles, gps_coordinate, title, overlay=False):
     """
@@ -152,7 +149,7 @@ def plot_particles_with_weights(particles, gps_coordinate, title, overlay=False)
         plt.figure()
 
     # Scatter plot of particles, color-coded by normalized weight
-    scatter = plt.scatter(x_vals, y_vals, c=norm_weights, cmap='viridis', s=10, label='Particles',zorder = 5) #cmap='viridis'
+    scatter = plt.scatter(x_vals, y_vals, c=norm_weights, cmap='viridis', s=10, label='Particles') #cmap='viridis'
 
     # Plot the GPS coordinate
     # plt.scatter(gps_coordinate[0], gps_coordinate[1], c='red', s=50, label='GPS Measurement', zorder = 10, marker = '*')
@@ -234,12 +231,10 @@ def predict_particles(particles, u):
         particles[i].y = px[1, 0]
         particles[i].yaw = px[2, 0]
 
-        particles[i].history.append((particles[i].x, particles[i].y, particles[i].yaw))
-
     return particles
 
 
-def add_new_landmark(particle, z, Q_cov):
+def add_new_lm(particle, z, Q_cov):
     r = z[0]
     b = z[1]
     lm_id = int(z[2])
@@ -253,12 +248,12 @@ def add_new_landmark(particle, z, Q_cov):
     # covariance
     dx = r * c
     dy = r * s
-    d2 = dx**2 + dy**2
+    d2 = dx ** 2 + dy ** 2
     d = math.sqrt(d2)
     Gz = np.array([[dx / d, dy / d],
                    [-dy / d2, dx / d2]])
     particle.lmP[2 * lm_id:2 * lm_id + 2] = np.linalg.inv(
-        Gz) @ Q_cov @ np.linalg.inv(Gz.T) # Transforms the covariance from the measurement space to the cartesian space
+        Gz) @ Q_cov @ np.linalg.inv(Gz.T)
 
     return particle
 
@@ -270,15 +265,15 @@ def compute_jacobians(particle, xf, Pf, Q_cov):
     d = math.sqrt(d2)
 
     zp = np.array(
-        [d, pi_2_pi(math.atan2(dy, dx) - particle.yaw)]).reshape(2, 1) # Predicted measurement
+        [d, pi_2_pi(math.atan2(dy, dx) - particle.yaw)]).reshape(2, 1)
 
     Hv = np.array([[-dx / d, -dy / d, 0.0],
-                   [dy / d2, -dx / d2, -1.0]]) # Jacobian of the measurement model with respect to the particle's state (position and orientation)
+                   [dy / d2, -dx / d2, -1.0]])
 
     Hf = np.array([[dx / d, dy / d],
-                   [-dy / d2, dx / d2]]) # Jacobian of the measurement model with respect to the feature's position
+                   [-dy / d2, dx / d2]])
 
-    Sf = Hf @ Pf @ Hf.T + Q_cov # Innovation covariance 
+    Sf = Hf @ Pf @ Hf.T + Q_cov
 
     return zp, Hv, Hf, Sf
 
@@ -288,15 +283,10 @@ def update_kf_with_cholesky(xf, Pf, v, Q_cov, Hf):
     S = Hf @ PHt + Q_cov
 
     S = (S + S.T) * 0.5
-    # S += np.eye(S.shape[0]) * 1e-6  # Add a small value to the diagonal Stabilises for cholesky decomposition
-
-    # print("S:", S)
-    # print("Eigenvalues of S:", np.linalg.eigvals(S))
-
-    s_chol = np.linalg.cholesky(S).T
-    s_chol_inv = np.linalg.inv(s_chol)
-    W1 = PHt @ s_chol_inv
-    W = W1 @ s_chol_inv.T
+    SChol = np.linalg.cholesky(S).T
+    SCholInv = np.linalg.inv(SChol)
+    W1 = PHt @ SCholInv
+    W = W1 @ SCholInv.T
 
     x = xf + W @ v
     P = Pf - W1 @ W1.T
@@ -307,14 +297,14 @@ def update_kf_with_cholesky(xf, Pf, v, Q_cov, Hf):
 def update_landmark(particle, z, Q_cov):
     lm_id = int(z[2])
     xf = np.array(particle.lm[lm_id, :]).reshape(2, 1)
-    Pf = np.array(particle.lmP[2 * lm_id:2 * lm_id + 2, :])
+    Pf = np.array(particle.lmP[2 * lm_id:2 * lm_id + 2])
 
-    zp, Hv, Hf, Sf = compute_jacobians(particle, xf, Pf, Q)
+    zp, Hv, Hf, Sf = compute_jacobians(particle, xf, Pf, Q_cov)
 
     dz = z[0:2].reshape(2, 1) - zp
     dz[1, 0] = pi_2_pi(dz[1, 0])
 
-    xf, Pf = update_kf_with_cholesky(xf, Pf, dz, Q_cov, Hf)
+    xf, Pf = update_kf_with_cholesky(xf, Pf, dz, Q, Hf)
 
     particle.lm[lm_id, :] = xf.T
     particle.lmP[2 * lm_id:2 * lm_id + 2, :] = Pf
@@ -322,22 +312,21 @@ def update_landmark(particle, z, Q_cov):
     return particle
 
 
-def compute_weight(particle, z, Q_cov) :
+def compute_weight(particle, z, Q_cov):
     lm_id = int(z[2])
     xf = np.array(particle.lm[lm_id, :]).reshape(2, 1)
     Pf = np.array(particle.lmP[2 * lm_id:2 * lm_id + 2])
     zp, Hv, Hf, Sf = compute_jacobians(particle, xf, Pf, Q_cov)
 
-    dx = z[0:2].reshape(2, 1) - zp
-    dx[1, 0] = pi_2_pi(dx[1, 0])
+    dz = z[0:2].reshape(2, 1) - zp
+    dz[1, 0] = pi_2_pi(dz[1, 0])
 
     try:
         invS = np.linalg.inv(Sf)
     except np.linalg.linalg.LinAlgError:
-        print("singular")
         return 1.0
 
-    num = np.exp(-0.5 * (dx.T @ invS @ dx))[0, 0]
+    num = np.exp(-0.5 * dz.T @ invS @ dz)[0, 0]
     den = 2.0 * math.pi * math.sqrt(np.linalg.det(Sf))
 
     w = num / den
@@ -345,20 +334,46 @@ def compute_weight(particle, z, Q_cov) :
     return w
 
 
+def proposal_sampling(particle, z, Q_cov):
+    lm_id = int(z[2])
+    xf = particle.lm[lm_id, :].reshape(2, 1)
+    Pf = particle.lmP[2 * lm_id:2 * lm_id + 2]
+    # State
+    x = np.array([particle.x, particle.y, particle.yaw]).reshape(3, 1)
+    P = particle.P
+    zp, Hv, Hf, Sf = compute_jacobians(particle, xf, Pf, Q_cov)
+
+    Sfi = np.linalg.inv(Sf)
+    dz = z[0:2].reshape(2, 1) - zp
+    dz[1] = pi_2_pi(dz[1])
+
+    Pi = np.linalg.inv(P)
+
+    particle.P = np.linalg.inv(Hv.T @ Sfi @ Hv + Pi)  # proposal covariance
+    x += particle.P @ Hv.T @ Sfi @ dz  # proposal mean
+
+    particle.x = x[0, 0]
+    particle.y = x[1, 0]
+    particle.yaw = x[2, 0]
+
+    return particle
+
+
 def update_with_observation(particles, z):
     for iz in range(len(z[0, :])):
-
         landmark_id = int(z[2, iz])
 
         for ip in range(N_PARTICLE):
             # new landmark
             if abs(particles[ip].lm[landmark_id, 0]) <= 0.01:
-                particles[ip] = add_new_landmark(particles[ip], z[:, iz], Q)
+                particles[ip] = add_new_lm(particles[ip], z[:, iz], Q)
             # known landmark
             else:
                 w = compute_weight(particles[ip], z[:, iz], Q)
                 particles[ip].w *= w
+
                 particles[ip] = update_landmark(particles[ip], z[:, iz], Q)
+                particles[ip] = proposal_sampling(particles[ip], z[:, iz], Q)
 
     return particles
 
@@ -381,7 +396,6 @@ def resampling(particles):
     print(f"Effective particle number (n_eff): {n_eff}")
 
     if n_eff < NTH:  # resampling
-        print("Resampling")
         w_cum = np.cumsum(pw)
         base = np.cumsum(pw * 0.0 + 1 / N_PARTICLE) - 1 / N_PARTICLE
         resample_id = base + np.random.rand(base.shape[0]) / N_PARTICLE
@@ -412,7 +426,7 @@ def calc_input(time):
     #     yaw_rate = 0.0
     # else:
     #     v = 1.0  # [m/s]
-    #     yaw_rate = 0.0  # [rad/s]
+    #     yaw_rate = 0.1  # [rad/s]
 
     v = 1.0  # [m/s]
     yaw_rate = 0.0  # [rad/s]
@@ -427,6 +441,7 @@ def calc_input(time):
 
 #     # add noise to range observation
 #     z = np.zeros((3, 0))
+
 #     for i in range(len(rfid[:, 0])):
 
 #         dx = rfid[i, 0] - x_true[0, 0]
@@ -435,9 +450,9 @@ def calc_input(time):
 #         angle = pi_2_pi(math.atan2(dy, dx) - x_true[2, 0])
 #         if d <= MAX_RANGE:
 #             dn = d + np.random.randn() * Q_SIM[0, 0] ** 0.5  # add noise
-#             angle_with_noize = angle + np.random.randn() * Q_SIM[
-#                 1, 1] ** 0.5  # add noise
-#             zi = np.array([dn, pi_2_pi(angle_with_noize), i]).reshape(3, 1)
+#             angle_noise = np.random.randn() * Q_SIM[1, 1] ** 0.5
+#             angle_with_noise = angle + angle_noise  # add noise
+#             zi = np.array([dn, pi_2_pi(angle_with_noise), i]).reshape(3, 1)
 #             z = np.hstack((z, zi))
 
 #     # add noise to input
@@ -456,6 +471,7 @@ def observation(x_true, xd, u, rfid):
 
     # Add noise to range observation
     z = np.zeros((3, 0))
+
     for i in range(len(rfid[:, 0])):
         dx = rfid[i, 0] - x_true[0, 0]
         dy = rfid[i, 1] - x_true[1, 0]
@@ -464,8 +480,9 @@ def observation(x_true, xd, u, rfid):
 
         # Check if within range and angle limits
         if d <= MAX_RANGE and -MAX_ANGLE_RANGE <= angle <= MAX_ANGLE_RANGE:
-            dn = d + np.random.randn() * Q_SIM[0, 0] ** 0.5  # Add noise to distance
-            angle_with_noise = angle + np.random.randn() * Q_SIM[1, 1] ** 0.5  # Add noise to angle
+            dn = d + np.random.randn() * Q_SIM[0, 0] ** 0.5  # Add noise to range
+            angle_noise = np.random.randn() * Q_SIM[1, 1] ** 0.5  # Add noise to angle
+            angle_with_noise = angle + angle_noise
             zi = np.array([dn, pi_2_pi(angle_with_noise), i]).reshape(3, 1)
             z = np.hstack((z, zi))
 
@@ -478,7 +495,6 @@ def observation(x_true, xd, u, rfid):
     xd = motion_model(xd, ud)
 
     return x_true, z, xd, ud
-
 
 
 def motion_model(x, u):
@@ -504,7 +520,6 @@ def motion_model(x, u):
     return x
 
 
-
 def pi_2_pi(angle):
     return angle_mod(angle)
 
@@ -516,17 +531,22 @@ def main():
     save_fig_number = 0
 
     # RFID positions [x, y]
-    rfid = np.array([[4.0, -2.0],
-                     [5.0, -3.0],
-                     [10.0, 5.0],
-                     [12.0, -6.0],
-                     [4.0, 8.0]])
+    rfid = np.array([[10.0, -2.0],
+                     [15.0, 10.0],
+                     [15.0, 15.0],
+                     [10.0, 20.0],
+                     [3.0, 15.0],
+                     [-5.0, 20.0],
+                     [-5.0, 5.0],
+                     [-10.0, 15.0]
+                     ])
+    
     rfid = np.array([[2.0, 1.0],
-                [3.0, -1.0],
-                [3.8, 1.0],
-                [4.0, -0.5],
-                [5.1, 0.8]])
-  
+            [3.0, -1.0],
+            [3.8, 1.0],
+            [4.0, -0.5],
+            [5.1, 0.8]])
+    
     n_landmark = rfid.shape[0]
 
     # State Vector [x y yaw v]'
@@ -534,97 +554,63 @@ def main():
     x_true = np.zeros((STATE_SIZE, 1))  # True state
     x_dr = np.zeros((STATE_SIZE, 1))  # Dead reckoning
 
-    # History
+    # history
     hist_x_est = x_est
     hist_x_true = x_true
     hist_x_dr = x_dr
 
-    # Initialize particles
     particles = [Particle(n_landmark) for _ in range(N_PARTICLE)]
-
-    # #First plot t=0
-    # for i in range(N_PARTICLE):
-    #             plt.plot(particles[i].x, particles[i].y, ".g", markersize = 10)
-    # plt.plot(rfid[:, 0], rfid[:, 1], "*k")
-    # plt.show()
-    # if save_fig_number != 10:
-    #             plt.savefig(f"SLAM/FastSLAM1/Plots/FastSLAM1_{save_fig_number}.png", bbox_inches="tight")  
-    #             save_fig_number += 1  # Increment the counter for the next iteration
-                
-    hist_particles = particles
-
 
     while SIM_TIME >= time:
         time += DT
         u = calc_input(time)
-        # print(u)
-        
-        hist_x_est_prev = copy.deepcopy(x_true)
-
-        x_true, z, x_dr, ud = observation(x_true, x_dr, u, rfid)
-        
-        plot_observation_line(x_true, z)
 
         plt.plot(rfid[:, 0], rfid[:, 1], "*k", markersize = 10, zorder = 11)
-        predicted_particles, particles = fast_slam1(particles, ud, z)
+        x_true, z, x_dr, ud = observation(x_true, x_dr, u, rfid)
+        
+          
+        plot_observation_line(x_true, z)
+
+        particles = fast_slam2(particles, ud, z)
 
         x_est = calc_final_state(particles)
-        
         plt.plot(x_est[0], x_est[1], "*r", markersize = 6, zorder = 11)
         if save_fig_number != 8:
-            plt.savefig(f"SLAM/FastSLAM1/Plots/FastSLAM1_{save_fig_number}.png", bbox_inches="tight")  
+            plt.savefig(f"SLAM/FastSLAM2/Plots/FastSLAM2_{save_fig_number}.png", bbox_inches="tight")  
             save_fig_number += 1  # Increment the counter for the next iteration
-            
-        # Errase observation lines and landmark particle for reduced clutter
-        # plot_observation_line(x_true, z, ax=None, linewidth=2.0, color="white")
-        # for i in range(N_PARTICLE):
-        #     plt.plot(particles[i].lm[:, 0], particles[i].lm[:, 1], "x", color="white", markersize = 5, zorder = 3)
-        # plt.xlim([-0.2, 7.2])
-        # plt.ylim([-1.5, 1.5])
-        # plt.gca().set_aspect('equal', adjustable='box')
-        # plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
-        # plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
-        # plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
 
         x_state = x_est[0: STATE_SIZE]
 
-        # Store data history
+        # store data history
         hist_x_est = np.hstack((hist_x_est, x_state))
         hist_x_dr = np.hstack((hist_x_dr, x_dr))
         hist_x_true = np.hstack((hist_x_true, x_true))
 
-        if show_animation:  # pragma: no cover
-            # plt.cla()
-            # # For stopping simulation with the ESC key.
-            # plt.gcf().canvas.mpl_connect(
-            #     'key_release_event', lambda event:
-            #     [exit(0) if event.key == 'escape' else None])
+        # if show_animation:  # pragma: no cover
+        #     plt.cla()
+        #     # for stopping simulation with the esc key.
+        #     plt.gcf().canvas.mpl_connect(
+        #         'key_release_event',
+        #         lambda event: [exit(0) if event.key == 'escape' else None])
+        #     plt.plot(rfid[:, 0], rfid[:, 1], "*k")
 
-            # # Plot RFID positions
-            
+        #     for iz in range(len(z[:, 0])):
+        #         landmark_id = int(z[2, iz])
+        #         plt.plot([x_est[0][0], rfid[landmark_id, 0]], [
+        #             x_est[1][0], rfid[landmark_id, 1]], "-k")
 
-            # # Plot particle trajectories
-            # for i in range(N_PARTICLE):
-            #     plt.plot(predicted_particles[i].x, predicted_particles[i].y, ".", color = "blue", markersize = 6)
-            #     plt.plot(particles[i].x, particles[i].y, ".r",  markersize = 3)
-            #     # plt.plot(particles[i].lm[:, 0], particles[i].lm[:, 1], "xb")
+        #     for i in range(N_PARTICLE):
+        #         plt.plot(particles[i].x, particles[i].y, ".r")
+        #         plt.plot(particles[i].lm[:, 0], particles[i].lm[:, 1], "xb")
 
-            # # Plot SLAM, dead reckoning, and true paths
-            # # plt.plot(hist_x_true[0, :], hist_x_true[1, :], "-b")
-            # # plt.plot(hist_x_dr[0, :], hist_x_dr[1, :], "-k")
-            # # plt.plot(hist_x_est[0, :], hist_x_est[1, :], "-r")
-            # plt.plot(x_est[0], x_est[1], "xk")
+        #     plt.plot(hist_x_true[0, :], hist_x_true[1, :], "-b")
+        #     plt.plot(hist_x_dr[0, :], hist_x_dr[1, :], "-k")
+        #     plt.plot(hist_x_est[0, :], hist_x_est[1, :], "-r")
+        #     plt.plot(x_est[0], x_est[1], "xk")
+        #     plt.axis("equal")
+        #     plt.grid(True)
+        #     plt.pause(0.001)
 
-            # plt.axis("equal")
-            # plt.grid(True)
-            plt.pause(0.001)
-
-            # if save_fig_number != 10:
-            #     plt.savefig(f"SLAM/FastSLAM1/Plots/FastSLAM1_{save_fig_number}.png", bbox_inches="tight")  
-            #     save_fig_number += 1  # Increment the counter for the next iteration
 
 if __name__ == '__main__':
     main()
-
-
-    

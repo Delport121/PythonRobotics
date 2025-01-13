@@ -399,7 +399,7 @@ def main():
                 ax[1].set_visible(False)
 
                 # Save only ax[0]
-                plt.savefig(f"SLAM/EKFSLAM/Plots/EKF_SLAM_{save_fig}.svg", format="svg", bbox_inches="tight")  
+                plt.savefig(f"SLAM/EKFSLAM/Plots/EKF_SLAM_{save_fig}.png", format="png", bbox_inches="tight")  
                 save_fig += 1  # Increment the counter for the next iteration
 
                 # Make ax[1] visible again after saving
