@@ -76,12 +76,14 @@ def fast_slam2(particles, u, z):
 
     #First plot t=0 and will also plot resampled partilces
     for i in range(N_PARTICLE):
-                plt.plot(particles[i].x, particles[i].y, ".g", markersize = 5)
+                plt.plot(particles[i].x, particles[i].y, ".g", markersize = 5, zorder = 5)
     # print("Prev particles x", prev_particles[0].x)
     # print("Prev particles y", prev_particles[0].y)
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for x-axis
+    plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for y-axis
     plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
     plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
     plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
@@ -94,12 +96,14 @@ def fast_slam2(particles, u, z):
         plt.plot(
             [prev_particles[i].x, predicted_particles[i].x],
             [prev_particles[i].y, predicted_particles[i].y],
-            "-o",color="grey", linewidth=0.5,markersize = 2,zorder=1  # Blue line for propagation
+            "-o",color="grey", linewidth=0.5,markersize = 2, zorder=4  # Blue line for propagation
         )
         # plt.plot(predicted_particles[i].x, predicted_particles[i].y, ".k", markersize=2)  # Predicted particles
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for x-axis
+    plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for y-axis
     plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
     plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
     plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
@@ -109,10 +113,12 @@ def fast_slam2(particles, u, z):
     
     #Plot land mark partilces of each particle
     for i in range(N_PARTICLE):
-        plt.plot(updated_particles[i].lm[:, 0], updated_particles[i].lm[:, 1], "xb", markersize = 2, zorder = 1)
+        plt.plot(updated_particles[i].lm[:, 0], updated_particles[i].lm[:, 1], "xb", markersize = 2, zorder = 3)
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for x-axis
+    plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for y-axis
     plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
     plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
     plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
@@ -123,6 +129,8 @@ def fast_slam2(particles, u, z):
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for x-axis
+    plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for y-axis
     plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
     plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
     plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
@@ -149,7 +157,7 @@ def plot_particles_with_weights(particles, gps_coordinate, title, overlay=False)
         plt.figure()
 
     # Scatter plot of particles, color-coded by normalized weight
-    scatter = plt.scatter(x_vals, y_vals, c=norm_weights, cmap='viridis', s=10, label='Particles') #cmap='viridis'
+    scatter = plt.scatter(x_vals, y_vals, c=norm_weights, cmap='viridis', s=10, label='Particles', zorder =5) #cmap='viridis'
 
     # Plot the GPS coordinate
     # plt.scatter(gps_coordinate[0], gps_coordinate[1], c='red', s=50, label='GPS Measurement', zorder = 10, marker = '*')
@@ -187,6 +195,11 @@ def plot_observation_line(x, z, ax=None, linewidth=1.0, color="k"):
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for x-axis
+    plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for y-axis
+    plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
+    plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
+    plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     # plt.show()
 
 def normalize_weight(particles):
@@ -396,6 +409,7 @@ def resampling(particles):
     print(f"Effective particle number (n_eff): {n_eff}")
 
     if n_eff < NTH:  # resampling
+        print("Resampling")
         w_cum = np.cumsum(pw)
         base = np.cumsum(pw * 0.0 + 1 / N_PARTICLE) - 1 / N_PARTICLE
         resample_id = base + np.random.rand(base.shape[0]) / N_PARTICLE
@@ -578,6 +592,16 @@ def main():
         if save_fig_number != 8:
             plt.savefig(f"SLAM/FastSLAM2/Plots/FastSLAM2_{save_fig_number}.png", bbox_inches="tight")  
             save_fig_number += 1  # Increment the counter for the next iteration
+            
+        plot_observation_line(x_true, z, ax=None, linewidth=2.0, color="white")
+        # for i in range(N_PARTICLE):
+        #     plt.plot(particles[i].lm[:, 0], particles[i].lm[:, 1], "x", color="white", markersize = 5, zorder = 3)
+        # plt.xlim([-0.2, 7.2])
+        # plt.ylim([-1.5, 1.5])
+        # plt.gca().set_aspect('equal', adjustable='box')
+        # plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
+        # plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
+        # plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
 
         x_state = x_est[0: STATE_SIZE]
 

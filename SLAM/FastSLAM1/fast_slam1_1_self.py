@@ -18,13 +18,14 @@ from utils.angle import angle_mod
 
 # Fast SLAM covariance
 Q = np.diag([0.08, np.deg2rad(10.0)]) ** 2 #0 may cause issues with cholesky decomposition
-R = np.diag([0.2, np.deg2rad(10.0)]) ** 2 #Determine variance in input for different particles
-R = np.diag([0.05, np.deg2rad(2)]) ** 2 #Determine variance in input for different particles
+Q = np.diag([0.08, np.deg2rad(1.0)]) ** 2 #0 may cause issues with cholesky decomposition
+R = np.diag([0.02, np.deg2rad(1.0)]) ** 2 #Determine variance in input for different particles
+# R = np.diag([0.05, np.deg2rad(2)]) ** 2 #Determine variance in input for different particles
 
 
 
 #  Simulation parameter
-Q_SIM = np.diag([0.01, np.deg2rad(1.0)]) ** 2 #Need to have non-zero values for cholesky decomposition
+Q_SIM = np.diag([0.001, np.deg2rad(00.10)]) ** 2 #Need to have non-zero values for cholesky decomposition
 R_SIM = np.diag([0.01, np.deg2rad(1.0)]) ** 2 #Determine a variance in input that is used for all particles
 OFFSET_YAW_RATE_NOISE = 0.0
 
@@ -43,7 +44,7 @@ MAX_RANGE = 20.0  # maximum observation range
 M_DIST_TH = 2.0  # Threshold of Mahalanobis distance for data association.
 STATE_SIZE = 3  # State size [x,y,yaw]
 LM_SIZE = 2  # LM state size [x,y]
-N_PARTICLE = 100  # number of particle
+N_PARTICLE = 200  # number of particle
 NTH = N_PARTICLE / 1.2  # Number of particle for re-sampling
 
 MAX_ANGLE_RANGE = math.pi / 2.0  # maximum angle observation range
@@ -76,67 +77,69 @@ def fast_slam1(particles, u, z):
 
    
     
-    #First plot t=0 and will also plot resampled partilces
-    for i in range(N_PARTICLE):
-                plt.plot(particles[i].x, particles[i].y, ".g", markersize = 5,zorder = 5)
-    # print("Prev particles x", prev_particles[0].x)
-    # print("Prev particles y", prev_particles[0].y)
-    plt.xlim([-0.2, 7.2])
-    plt.ylim([-1.5, 1.5])
-    plt.gca().set_aspect('equal', adjustable='box')
-    plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
-    plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
-    plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
-    plt.show()
+    # #First plot t=0 and will also plot resampled partilces
+    # for i in range(N_PARTICLE):
+    #             plt.plot(particles[i].x, particles[i].y, ".g", markersize = 5,zorder = 5)
+    # # print("Prev particles x", prev_particles[0].x)
+    # # print("Prev particles y", prev_particles[0].y)
+    # plt.xlim([-0.2, 7.2])
+    # plt.ylim([-1.5, 1.5])
+    # plt.gca().set_aspect('equal', adjustable='box')
+    # plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for x-axis
+    # plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for y-axis
+    # plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
+    # plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
+    # plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
+    # plt.show()
 
     predicted_particles = predict_particles(particles, u)
+    pred_particles = copy.deepcopy(predicted_particles)
 
     # Plot propagation lines
     for i in range(N_PARTICLE):
         plt.plot(
             [prev_particles[i].x, predicted_particles[i].x],
             [prev_particles[i].y, predicted_particles[i].y],
-            "-o",color="grey", linewidth=0.5,markersize = 2,zorder=4
+            "-o",color="grey", linewidth=0.5,markersize = 2, zorder=4
         )
         # plt.plot(predicted_particles[i].x, predicted_particles[i].y, ".k", markersize=2)  # Predicted particles
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for x-axis
+    plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for y-axis
     plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
     plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
     plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     plt.show()
 
     updated_particles = update_with_observation(predicted_particles, z)
+    up_particles = copy.deepcopy(updated_particles)
     
     #Plot land mark partilces of each particle
-    for i in range(N_PARTICLE):
-        plt.plot(updated_particles[i].lm[:, 0], updated_particles[i].lm[:, 1], "xb", markersize = 2, zorder = 3)
-    plt.xlim([-0.2, 7.2])
-    plt.ylim([-1.5, 1.5])
-    plt.gca().set_aspect('equal', adjustable='box')
-    plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
-    plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
-    plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
+    plot_landmarks_with_weights(updated_particles, overlay=True)
     plt.show()
+    
+   
 
     # Plot original particles with color intensity based on weights
-    plot_particles_with_weights(updated_particles, z, title="Original Particles Before Resampling", overlay=True)
+    plot_particles_with_weights(updated_particles, overlay=True)
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for x-axis
+    plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for y-axis
     plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
     plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
     plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     plt.show()
     
+    resampled_particles = resampling(updated_particles)
     
 
-    resampled_particles = resampling(updated_particles)
+    return pred_particles, up_particles, resampled_particles
 
-    return predicted_particles, resampled_particles
-
-def plot_particles_with_weights(particles, gps_coordinate, title, overlay=False):
+def plot_particles_with_weights(particles, overlay=False):
     """
     Plot particles, with color intensity corresponding to the weight.
     Optionally overlay particles on an existing plot.
@@ -171,6 +174,41 @@ def plot_particles_with_weights(particles, gps_coordinate, title, overlay=False)
     if not overlay:
         plt.show()
         
+def plot_landmarks_with_weights(particles, overlay=False):
+    """
+    Plot landmarks from particles as lines, with color intensity corresponding to particle weight.
+    Optionally overlay landmarks on an existing plot.
+    
+    Args:
+        particles: List of particle objects, where each has landmarks (lm) and a weight (w).
+        overlay: If True, overlay the plot on an existing figure.
+    """
+    if not overlay:
+        plt.figure()
+
+    # Normalize weights to map to a color scale
+    weights = [particle.w for particle in particles]
+    norm_weights = np.array(weights) / max(weights)
+
+    # Iterate through particles to plot landmarks as lines
+    for i, particle in enumerate(particles):
+        lm_x = particle.lm[:, 0]  # Landmark x-coordinates
+        lm_y = particle.lm[:, 1]  # Landmark y-coordinates
+        plt.plot(lm_x, lm_y, ".", markersize = 4, label=f"Particle {i}", color=plt.cm.viridis(norm_weights[i]),  zorder=3)
+
+    # Set plot appearance
+    plt.xlim([-0.2, 7.2])
+    plt.ylim([-1.5, 1.5])
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1.0))
+    plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1.0))
+    plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
+    plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
+    plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
+
+    if not overlay:
+        plt.show()
+        
 def plot_observation_line(x, z, ax=None, linewidth=1.0, color="k"):
     for i in range(z.shape[1]):  # Iterate over columns since z is now (3, N)
         # Extract range and angle from the observation
@@ -190,6 +228,11 @@ def plot_observation_line(x, z, ax=None, linewidth=1.0, color="k"):
     plt.xlim([-0.2, 7.2])
     plt.ylim([-1.5, 1.5])
     plt.gca().set_aspect('equal', adjustable='box')
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for x-axis
+    plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for y-axis
+    plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
+    plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
+    plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
     # plt.show()
 
 def normalize_weight(particles):
@@ -233,8 +276,6 @@ def predict_particles(particles, u):
         particles[i].x = px[0, 0]
         particles[i].y = px[1, 0]
         particles[i].yaw = px[2, 0]
-
-        particles[i].history.append((particles[i].x, particles[i].y, particles[i].yaw))
 
     return particles
 
@@ -380,7 +421,7 @@ def resampling(particles):
     print("Eff Threshold:", NTH)
     print(f"Effective particle number (n_eff): {n_eff}")
 
-    if n_eff < NTH:  # resampling
+    if n_eff < NTH or True:  # resampling
         print("Resampling")
         w_cum = np.cumsum(pw)
         base = np.cumsum(pw * 0.0 + 1 / N_PARTICLE) - 1 / N_PARTICLE
@@ -420,35 +461,6 @@ def calc_input(time):
 
     return u
 
-
-# def observation(x_true, xd, u, rfid):
-#     # calc true state
-#     x_true = motion_model(x_true, u)
-
-#     # add noise to range observation
-#     z = np.zeros((3, 0))
-#     for i in range(len(rfid[:, 0])):
-
-#         dx = rfid[i, 0] - x_true[0, 0]
-#         dy = rfid[i, 1] - x_true[1, 0]
-#         d = math.hypot(dx, dy)
-#         angle = pi_2_pi(math.atan2(dy, dx) - x_true[2, 0])
-#         if d <= MAX_RANGE:
-#             dn = d + np.random.randn() * Q_SIM[0, 0] ** 0.5  # add noise
-#             angle_with_noize = angle + np.random.randn() * Q_SIM[
-#                 1, 1] ** 0.5  # add noise
-#             zi = np.array([dn, pi_2_pi(angle_with_noize), i]).reshape(3, 1)
-#             z = np.hstack((z, zi))
-
-#     # add noise to input
-#     ud1 = u[0, 0] + np.random.randn() * R_SIM[0, 0] ** 0.5
-#     ud2 = u[1, 0] + np.random.randn() * R_SIM[
-#         1, 1] ** 0.5 + OFFSET_YAW_RATE_NOISE
-#     ud = np.array([ud1, ud2]).reshape(2, 1)
-
-#     xd = motion_model(xd, ud)
-
-#     return x_true, z, xd, ud
 
 def observation(x_true, xd, u, rfid):
     # Calculate the true state
@@ -551,7 +563,7 @@ def main():
     #             plt.savefig(f"SLAM/FastSLAM1/Plots/FastSLAM1_{save_fig_number}.png", bbox_inches="tight")  
     #             save_fig_number += 1  # Increment the counter for the next iteration
                 
-    hist_particles = particles
+    
 
 
     while SIM_TIME >= time:
@@ -559,14 +571,14 @@ def main():
         u = calc_input(time)
         # print(u)
         
-        hist_x_est_prev = copy.deepcopy(x_true)
+        hist_particles = copy.deepcopy(particles)
 
         x_true, z, x_dr, ud = observation(x_true, x_dr, u, rfid)
         
         plot_observation_line(x_true, z)
 
         plt.plot(rfid[:, 0], rfid[:, 1], "*k", markersize = 10, zorder = 11)
-        predicted_particles, particles = fast_slam1(particles, ud, z)
+        predicted_particles, updated_particles, particles = fast_slam1(particles, ud, z)
 
         x_est = calc_final_state(particles)
         
@@ -576,15 +588,17 @@ def main():
             save_fig_number += 1  # Increment the counter for the next iteration
             
         # Errase observation lines and landmark particle for reduced clutter
-        # plot_observation_line(x_true, z, ax=None, linewidth=2.0, color="white")
-        # for i in range(N_PARTICLE):
-        #     plt.plot(particles[i].lm[:, 0], particles[i].lm[:, 1], "x", color="white", markersize = 5, zorder = 3)
-        # plt.xlim([-0.2, 7.2])
-        # plt.ylim([-1.5, 1.5])
-        # plt.gca().set_aspect('equal', adjustable='box')
-        # plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
-        # plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
-        # plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
+        plot_observation_line(x_true, z, ax=None, linewidth=2.0, color="white")
+        for i in range(N_PARTICLE):
+            plt.plot(updated_particles[i].lm[:, 0], updated_particles[i].lm[:, 1], ".", color="white", markersize = 5, zorder = 3) #Particles gets shifted when resampled
+        plt.xlim([-0.2, 7.2])
+        plt.ylim([-1.5, 1.5])
+        plt.gca().set_aspect('equal', adjustable='box')
+        plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for x-axis
+        plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1.0))  # Interval of 1.0 for y-axis
+        plt.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, direction='in', length=3)
+        plt.tick_params(axis='x', which='both', direction='in', length=3, top=True)
+        plt.tick_params(axis='y', which='both', direction='in', length=3, right=True)
 
         x_state = x_est[0: STATE_SIZE]
 
