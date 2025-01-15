@@ -58,6 +58,8 @@ def ekf_slam(xEst, PEst, u, z):
     #Intermediate matrices to store the predicted state and covariance matrix
     xPredicted = xEst
     pPredicted = PEst
+    
+    
 
     # Update
     for iz in range(len(z[:, 0])):  # for each observation
